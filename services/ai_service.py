@@ -113,10 +113,12 @@ def retrieve_relevant_lore(user_query: str) -> tuple[str, int]:
     ][:2]
 
     if top_scored_chunks:
-        top_chunks_content = [chunk['content'] for chunk in top_scored_chunks]
-        source_files = sorted(list({chunk['source'] for chunk in top_scored_chunks})) # Уникальные и отсортированные имена файлов
+        # Собираем информацию для детального логирования
+        log_details = [f"'{chunk['source']}' ({chunk['score']} очков)" for chunk in top_scored_chunks]
+        logger.info(f"Найдено {len(top_scored_chunks)} релевантных абзацев (лучший результат: {max_score} очков).")
+        logger.info(f"Отправлено в ИИ: {len(top_scored_chunks)} абзац(а) из: {', '.join(log_details)}.")
 
-        logger.info(f"Найдено {len(top_chunks_content)} релевантных абзацев (лучший результат: {max_score} очков) из файлов: {source_files}.")
+        top_chunks_content = [chunk['content'] for chunk in top_scored_chunks]
         # Объединяем все отобранные абзацы в один блок контекста
         combined_chunks = "\n\n---\n\n".join(top_chunks_content)
         return combined_chunks, len(top_chunks_content)

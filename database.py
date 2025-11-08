@@ -48,19 +48,3 @@ def log_usage_to_db(username: str, user_message: str, usage_data, ai_response: s
             conn.commit()
     except sqlite3.Error as e:
         logger.error(f"Ошибка при записи в базу данных SQLite: {e}")
-
-def get_last_n_records(n: int) -> list[dict]:
-    """Извлекает последние N записей из таблицы usage."""
-    try:
-        with sqlite3.connect(DB_NAME) as conn:
-            # Устанавливаем row_factory, чтобы результат был в виде словаря, а не кортежа
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            # Выбираем последние N записей, сортируя по ID в обратном порядке
-            cursor.execute("SELECT * FROM usage ORDER BY id DESC LIMIT ?", (n,))
-            records = cursor.fetchall()
-            # Преобразуем каждую строку в обычный словарь
-            return [dict(row) for row in records]
-    except sqlite3.Error as e:
-        logger.error(f"Ошибка при чтении из базы данных SQLite: {e}")
-        return []

@@ -27,7 +27,6 @@ from handlers.start_command import start_handler
 from handlers.echo import echo_handler
 from handlers.reset_command import reset_handler, confirm_age_handler
 from handlers.media_handler import media_handler
-from handlers.admin_commands import stats_handler
 
 class HttpxLogFilter(logging.Filter):
     """
@@ -84,7 +83,6 @@ def main() -> None:
     application.add_handler(reset_handler)
     application.add_handler(confirm_age_handler)
     application.add_handler(media_handler)
-    application.add_handler(stats_handler)
 
     # Запускаем бота (он будет работать, пока вы не остановите процесс, например, нажав Ctrl+C)
     application.run_polling()
