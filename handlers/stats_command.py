@@ -58,21 +58,31 @@ async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     total_requests = sum(s['requests'] for s in stats)
     total_tokens = sum(s['total_tokens'] for s in stats)
     
-    message_lines = [
+    # Формируем заголовок с общей статистикой (с двойным переносом строки после каждой строки)
+    header_lines = [
         f"📊 *Статистика за {date_str}*",
         f"*Всего запросов:* {total_requests}",
         f"*Всего токенов:* {total_tokens:,}".replace(',', ' '),
         "---"
     ]
+    
+    # Формируем список моделей (без дополнительных пустых строк между ними)
+    model_lines = []
     for stat in stats:
         model_name = stat['model_name']
         spent_tokens = stat['total_tokens']
         # Получаем лимит для модели, если он не найден - ставим 0
         max_tokens = MODEL_TOKEN_LIMITS.get(model_name, 0)
         max_tokens_str = f"(макс: {max_tokens:,})".replace(',', ' ') if max_tokens > 0 else ""
-        message_lines.append(f"• `{model_name}`: *{stat['requests']}* запр., *{spent_tokens:,}* токенов {max_tokens_str}".replace(',', ' '))
+        model_lines.append(f"• `{model_name}`: *{stat['requests']}* запр., *{spent_tokens:,}* токенов {max_tokens_str}".replace(',', ' '))
 
-    await query.edit_message_text("\n".join(message_lines), parse_mode='Markdown')
+    # Собираем финальное сообщение:
+    # - Заголовок с двойными переносами между строками
+    # - Пустая строка перед списком моделей
+    # - Список моделей с двойными переносами между ними
+    message = "\n\n".join(header_lines) + "\n\n" + "\n\n".join(model_lines)
+    
+    await query.edit_message_text(message, parse_mode='Markdown')
 
 stats_handler = CommandHandler("stats", stats_command, filters=filters.ChatType.PRIVATE)
 stats_callback_handler = CallbackQueryHandler(stats_callback, pattern="^stats_")
