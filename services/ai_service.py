@@ -224,7 +224,7 @@ async def get_ai_response(message_history: list, username: str) -> tuple[str, st
 
     # Этот код выполнится, только если все модели из списка исчерпали лимиты
     logger.error("Все доступные модели исчерпали свои лимиты.")
-    return "Мля, я заманался с тобой болтать. Приходи в другой раз.", "limit_exceeded"
+    return "Мля, я заманался с тобой болтать. Приходи в другой раз. (токены закончились, напиши через несколько часов)", "limit_exceeded"
 
 async def get_ai_response_without_lore(message_history: list, model: str, username: str) -> tuple[str, str]:
     """
