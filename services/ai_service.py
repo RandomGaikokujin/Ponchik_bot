@@ -220,11 +220,11 @@ async def get_ai_response(message_history: list, username: str) -> tuple[str, st
                 return await get_ai_response_without_lore(message_history, model, username)
 
             logger.error(f"Критическая ошибка при обращении к Groq API с моделью {model}: {e}")
-            return "Хм, чёт у меня какие-то неполадки... Напиши потом."
+            return "Хм, чёт у меня какие-то неполадки... Напиши потом.", "error"
 
     # Этот код выполнится, только если все модели из списка исчерпали лимиты
     logger.error("Все доступные модели исчерпали свои лимиты.")
-    return "Мля, я заманался с тобой болтать. Приходи в другой раз."
+    return "Мля, я заманался с тобой болтать. Приходи в другой раз.", "limit_exceeded"
 
 async def get_ai_response_without_lore(message_history: list, model: str, username: str) -> tuple[str, str]:
     """
@@ -249,4 +249,4 @@ async def get_ai_response_without_lore(message_history: list, model: str, userna
         return ai_message, model
     except Exception as e:
         logger.error(f"Критическая ошибка при обращении к Groq API с моделью {model}: {e}")
-        return "Хм, чёт у меня какие-то неполадки... Напиши потом."
+        return "Хм, чёт у меня какие-то неполадки... Напиши потом.", "error"

@@ -8,6 +8,23 @@ from services.ai_service import get_ai_response
 
 logger = logging.getLogger(__name__)
 
+def is_spam(text: str) -> bool:
+    """
+    Проверяет, является ли текст бессмысленным набором символов.
+    Возвращает True, если сообщение похоже на спам.
+    """
+    length = len(text)
+    if length < 100: # Короткие сообщения не проверяем
+        return False
+
+    # Считаем количество букв и цифр
+    alnum_count = sum(1 for char in text if char.isalnum())
+    # Считаем количество уникальных символов
+    unique_chars = len(set(text))
+
+    # Если в длинном сообщении очень мало букв/цифр или очень мало уникальных символов, считаем это спамом.
+    return (alnum_count / length < 0.3) or (unique_chars < 10 and length > 200)
+
 async def echo_logic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Отвечает на текстовое сообщение с помощью ИИ."""
     user = update.effective_user
@@ -18,6 +35,12 @@ async def echo_logic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not context.user_data.get("age_verified"):
         logger.warning(f"Пользователь {user.full_name} ({user.id}) попытался написать боту без подтверждения возраста.")
         await update.message.reply_text("Сначала подтверди свой возраст, нажав /start.")
+        return
+
+    # Проверяем сообщение на спам перед отправкой в ИИ
+    if is_spam(message_text):
+        logger.warning(f"Пользователь {user.full_name} ({user.id}) отправил спам (длина: {len(message_text)}). Сообщение заблокировано.")
+        await update.message.reply_text("Ты че, по клаве долбишься? Напиши что-то осмысленное, а не эту хуйню.")
         return
 
     # Получаем или создаем историю сообщений для этого пользователя
