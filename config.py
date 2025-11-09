@@ -50,6 +50,8 @@ try:
     BOT_TOKEN = get_env_var("BOT_TOKEN")
     GROQ_API_KEY = get_env_var("GROQ_API_KEY")
     SUPPORT_LINK = get_env_var("SUPPORT_LINK")
+    # Загружаем ID администратора. Он должен быть числом.
+    ADMIN_ID = get_env_var("ADMIN_ID", is_int=True)
     # Загружаем системный промпт из файла, а не из .env
     SYSTEM_PROMPT = load_prompt_from_file("system_prompt.txt")
 except (ValueError, FileNotFoundError):

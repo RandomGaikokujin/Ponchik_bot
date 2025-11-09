@@ -44,6 +44,7 @@ from handlers.echo import echo_handler
 from handlers.reset_command import reset_handler, confirm_age_handler
 from handlers.media_handler import media_handler
 from handlers.support_command import support_handler
+from handlers.stats_command import stats_handler, stats_callback_handler
 
 class HttpxLogFilter(logging.Filter):
     """
@@ -102,13 +103,17 @@ def main() -> None:
     # Создаем приложение, передаем ему токен бота и объект для сохранения данных.
     application = Application.builder().token(BOT_TOKEN).persistence(persistence).post_init(post_init).build()
 
-    # Регистрируем обработчики из модулей
+    # --- РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ---
+    # Важен порядок: сначала специфичные (команды, диалоги), затем более общие (текст, медиа).
+    
     application.add_handler(start_handler)
-    application.add_handler(echo_handler)
     application.add_handler(reset_handler)
-    application.add_handler(confirm_age_handler)
-    application.add_handler(media_handler)
     application.add_handler(support_handler)
+    application.add_handler(stats_handler)
+    application.add_handler(confirm_age_handler)
+    application.add_handler(stats_callback_handler) # Обработчик кнопок статистики
+    application.add_handler(media_handler)
+    application.add_handler(echo_handler) # Общий обработчик текста ставим в конце
 
     # Запускаем бота (он будет работать, пока вы не остановите процесс, например, нажав Ctrl+C)
     application.run_polling()

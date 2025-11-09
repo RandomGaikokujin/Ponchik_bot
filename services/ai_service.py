@@ -152,6 +152,23 @@ MODELS_TO_TRY = [
     "qwen/qwen3-32b"
 ]
 
+# --- СЛОВАРЬ С СУТОЧНЫМИ ЛИМИТАМИ ТОКЕНОВ ДЛЯ КАЖДОЙ МОДЕЛИ ---
+# !!! ВАЖНО: Эти значения нужно будет поддерживать в актуальном состоянии вручную.
+# Укажите здесь суточный лимит токенов для каждой модели, которую вы используете.
+MODEL_TOKEN_LIMITS = {
+    "groq/compound": 123,
+    "groq/compound-mini": 123,
+    "llama-3.3-70b-versatile": 100_000,
+    "moonshotai/kimi-k2-instruct": 300_000,
+    "moonshotai/kimi-k2-instruct-0905": 300_000,
+    "openai/gpt-oss-120b": 200_000,
+    "openai/gpt-oss-20b": 200_000,
+    "allam-2-7b": 500_000,
+    "llama-3.1-8b-instant": 500_000,
+    "meta-llama/llama-4-maverick-17b-128e-instruct": 500_000,
+    "qwen/qwen3-32b": 500_000,
+}
+
 # Рекомендованные:
     # "llama-3.1-8b-instant",
     # "llama-3.3-70b-versatile",
@@ -208,7 +225,7 @@ async def get_ai_response(message_history: list, username: str) -> tuple[str, st
             ai_message = _strip_think_tags(raw_message)
             # Логируем использование токенов в консоль и в БД
             logger.info(f"Token Usage: {username} - {response.usage.total_tokens} (Total)")
-            log_usage_to_db(username, user_query, response.usage, ai_message, lore_chunks_count)
+            log_usage_to_db(username, user_query, response.usage, ai_message, lore_chunks_count, model)
             return ai_message, model
         except RateLimitError:
             logger.warning(f"Достигнут лимит для модели ({model}). Переключаюсь на следующую.")
@@ -245,7 +262,7 @@ async def get_ai_response_without_lore(message_history: list, model: str, userna
         ai_message = _strip_think_tags(raw_message)
         # Логируем использование токенов в консоль и в БД
         logger.info(f"Token Usage (without lore): {username} - {response.usage.total_tokens} (Total)")
-        log_usage_to_db(username, message_history[-1]['content'], response.usage, ai_message, lore_chunks_count=0)
+        log_usage_to_db(username, message_history[-1]['content'], response.usage, ai_message, lore_chunks_count=0, model_name=model)
         return ai_message, model
     except Exception as e:
         logger.error(f"Критическая ошибка при обращении к Groq API с моделью {model}: {e}")
