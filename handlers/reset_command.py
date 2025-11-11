@@ -1,5 +1,6 @@
 import logging
 from telegram import Update
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, filters
 
 logger = logging.getLogger(__name__)
@@ -16,15 +17,22 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def confirm_age_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обрабатывает нажатие на кнопку подтверждения возраста."""
-    query = update.callback_query
-    await query.answer()
+    try:
+        query = update.callback_query
+        await query.answer()
 
-    user = update.effective_user
-    context.user_data["age_verified"] = True
-    logger.info(f"Пользователь {user.full_name} ({user.id}) подтвердил свой возраст.")
+        user = update.effective_user
+        context.user_data["age_verified"] = True
+        logger.info(f"Пользователь {user.full_name} ({user.id}) подтвердил свой возраст.")
 
-    # Убираем кнопку из сообщения, оставляя только текст.
-    await query.edit_message_reply_markup(reply_markup=None)
+        # Убираем кнопку из сообщения, оставляя только текст.
+        await query.edit_message_reply_markup(reply_markup=None)
+    except BadRequest as e:
+        # Ловим ошибку, если запрос устарел (например, после перезапуска бота)
+        if "Query is too old" in str(e):
+            logger.warning(f"Не удалось обработать подтверждение возраста: {e}")
+        else:
+            raise # Если это другая ошибка BadRequest, лучше ее увидеть
 
 # Создаем обработчик для команды /reset
 reset_handler = CommandHandler("reset", reset, filters=filters.ChatType.PRIVATE)

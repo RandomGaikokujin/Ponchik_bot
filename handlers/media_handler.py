@@ -16,7 +16,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     # Ответ в стиле Пончика
-    response_text = "Сорян, но я пока не распознаю картинки, видео или аудио"
+    response_text = "Сорян, но я пока не распознаю стикеры, картинки, видео или аудио"
     await update.message.reply_text(response_text)
 
 # Создаем фильтр для различных типов медиа в личных чатах.

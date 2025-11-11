@@ -3,6 +3,7 @@ from telegram import Update
 import re
 from telegram.ext import ContextTypes, MessageHandler, filters
 from telegram.constants import ChatAction
+from typing import Dict, Any
 
 # Импортируем утилиты и нужные компоненты из сервиса ИИ
 from services.ai_service import get_ai_response, retrieve_relevant_lore
@@ -16,7 +17,7 @@ def is_spam(text: str) -> bool:
     Возвращает True, если сообщение похоже на спам.
     """
     length = len(text)
-    if length < 100: # Короткие сообщения не проверяем
+    if length < 150: # Короткие сообщения не проверяем, можно увеличить порог
         return False
 
     # Считаем количество букв и цифр
@@ -25,7 +26,7 @@ def is_spam(text: str) -> bool:
     unique_chars = len(set(text))
 
     # Если в длинном сообщении очень мало букв/цифр или очень мало уникальных символов, считаем это спамом.
-    return (alnum_count / length < 0.3) or (unique_chars < 10 and length > 200)
+    return (alnum_count / length < 0.4) or (unique_chars < 15 and length > 200)
 
 def escape_markdown_v2(text: str) -> str:
     """Экранирует специальные символы для Telegram MarkdownV2."""
@@ -52,53 +53,58 @@ async def echo_logic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         logger.warning(f"Пользователь {user.full_name} ({user.id}) попытался написать боту без подтверждения возраста.")
         await update.message.reply_text("Сначала подтверди свой возраст, нажав /start.")
         return
+        
+    # Проверяем сообщение на спам
+    if is_spam(message_text):
+        logger.warning(f"Обнаружено спам-сообщение от {user.full_name} ({user.id}): '{message_text[:100]}...'")
+        await update.message.reply_text("Кажется, это сообщение похоже на спам. Попробуй написать что-нибудь другое.")
+        return
+
+    # Проверяем на слишком короткое сообщение
+    if len(message_text.strip()) <= 2:
+        await update.message.reply_text("И чё это? Напиши подробнее, ёпрст")
+        return
 
     # --- Этапы 1 и 2: Поиск релевантного лора и формирование промпта ---
     # Получаем или создаем историю сообщений для этого пользователя
     chat_history = context.user_data.get("chat_history", [])
-    # Добавляем сообщение пользователя в историю, только если это не команда
-    if not message_text.startswith('/'):
-        chat_history.append({"role": "user", "content": message_text})
+    # Добавляем текущее сообщение пользователя в историю для отправки в AI.
+    # Команды уже отфильтрованы на уровне MessageHandler, так что здесь проверка не нужна.
+    chat_history.append({"role": "user", "content": message_text})
 
     # Находим релевантные абзацы
     relevant_lore_chunk, lore_chunks_count = retrieve_relevant_lore(message_text)
 
-    # Формируем полный промпт, который был бы отправлен в ИИ
-    from config import SYSTEM_PROMPT
-    full_prompt_for_ai = SYSTEM_PROMPT
-    if relevant_lore_chunk:
-        full_prompt_for_ai += f"\n\nВОСПОМИНАНИЕ ИЗ ТВОЕЙ ИСТОРИИ ДЛЯ КОНТЕКСТА:\n{relevant_lore_chunk}"
-    
     # --- Этап 3: Отправка запроса в ИИ ---
     # Обрезаем историю до последних 6 сообщений, чтобы не превышать лимит контекста
-    context.user_data["chat_history"] = chat_history[-6:]
+    # и сохраняем в user_data
+    chat_history = chat_history[-6:]
+    context.user_data["chat_history"] = chat_history
 
     try:
         # Показываем статус набора текста
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
 
         # Получаем ответ от ИИ
-        response = await get_ai_response(chat_history, user.username or str(user.id))
-        if len(response) == 3:
-            ai_message, used_model, total_tokens = response
-        elif len(response) == 2:
-            ai_message, used_model = response
-            total_tokens = 0  # Или другое значение по умолчанию
-        else:
-            logger.error(f"Unexpected response from get_ai_response: {response}")
+        # Передаем полное имя пользователя для логирования
+        response: Dict[str, Any] = await get_ai_response(chat_history, user.full_name or str(user.id))
+        
+        ai_message = response.get("message")
+        used_model = response.get("model", "unknown")
+        total_tokens = response.get("tokens", "N/A")
 
         # Если получили ответ, отсылаем пользователю
         if ai_message:
             await update.message.reply_text(ai_message)
-            logger.info(f"[РУ]Бот ответил {user.full_name} ({user.id}) (модель: {used_model}) (token usage: {total_tokens or 'N/A'}): '{ai_message}'")
+            logger.info(f"[РУ]Бот ответил {user.full_name} ({user.id}) (модель: {used_model}) (token usage: {total_tokens}): '{ai_message}'")
             # Сохраняем ответ ассистента в историю только если это был успешный ответ от модели
-            # (т.е. used_model это название модели, а не 'error' или 'limit_exceeded')
-            if isinstance(used_model, str) and not any(err in used_model for err in ['error', 'limit_exceeded']):
+            if used_model not in ['error', 'limit_exceeded']:
                 chat_history.append({"role": "assistant", "content": ai_message})
+                # Сохраняем обновленную историю в user_data
                 context.user_data["chat_history"] = chat_history
         else:
             logger.warning("ИИ вернул пустой ответ.")
-            await update.message.reply_text("Извини, ничего не нашлось. Попробуй переформулировать запрос.")
+            await update.message.reply_text("Спроси лучш чё-нибудь другое.")
     except Exception as e:
         logger.exception(f"Ошибка при запросе к ИИ: {e}")
         await update.message.reply_text("У меня какие-то проблемы с ИИ сейчас — попробуй позже.")

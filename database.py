@@ -7,7 +7,8 @@ logger = logging.getLogger(__name__)
 
 # Создаем папку для данных, если она не существует.
 # На Railway этот путь будет указывать на подключенный том (Volume).
-DATA_DIR = "data"
+# Используем абсолютный путь для надежности на Railway
+DATA_DIR = "/app/data"
 os.makedirs(DATA_DIR, exist_ok=True)
 DB_NAME = os.path.join(DATA_DIR, "token_usage.db")
 
@@ -97,4 +98,27 @@ def get_stats_for_date(date_str: str) -> list[dict]:
             return stats
     except sqlite3.Error as e:
         logger.error(f"Ошибка при получении статистики из БД: {e}")
+        return []
+
+def get_top_users_for_date(date_str: str, limit: int = 20) -> list[dict]:
+    """
+    Возвращает топ пользователей по количеству запросов за указанную дату.
+    Каждый элемент списка — словарь: {'username': ..., 'requests': ..., 'total_tokens': ...}
+    """
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT username, COUNT(*) as requests, SUM(total_tokens) as total_tokens
+                FROM usage
+                WHERE date(timestamp) = ?
+                GROUP BY username
+                ORDER BY requests DESC, total_tokens DESC
+                LIMIT ?
+            """, (date_str, limit))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+    except sqlite3.Error as e:
+        logger.error(f"Ошибка при получении топа пользователей из БД: {e}")
         return []

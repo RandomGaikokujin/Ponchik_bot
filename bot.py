@@ -45,6 +45,7 @@ from handlers.reset_command import reset_handler, confirm_age_handler
 from handlers.media_handler import media_handler
 from handlers.support_command import support_handler
 from handlers.stats_command import stats_handler, stats_callback_handler
+from handlers.topusers_command import topusers_handler, topusers_callback_handler
 
 class HttpxLogFilter(logging.Filter):
     """
@@ -96,7 +97,7 @@ def main() -> None:
     init_db()
 
     # Определяем путь к папке с данными
-    DATA_DIR = "data"
+    DATA_DIR = "/app/data"
 
     # Создаем объект для сохранения данных. Файл будет создан в той же папке.
     persistence = PicklePersistence(filepath=os.path.join(DATA_DIR, "ponchik_bot_persistence"))
@@ -112,6 +113,8 @@ def main() -> None:
     application.add_handler(stats_handler)
     application.add_handler(confirm_age_handler)
     application.add_handler(stats_callback_handler) # Обработчик кнопок статистики
+    application.add_handler(topusers_handler)
+    application.add_handler(topusers_callback_handler)
     application.add_handler(media_handler)
     application.add_handler(echo_handler) # Общий обработчик текста ставим в конце
 
