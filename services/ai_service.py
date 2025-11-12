@@ -466,7 +466,6 @@ MODELS_TO_TRY = [
     "moonshotai/kimi-k2-instruct-0905",
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
-    "allam-2-7b",
     "llama-3.1-8b-instant",
     "meta-llama/llama-4-maverick-17b-128e-instruct",
     "qwen/qwen3-32b"
@@ -481,7 +480,6 @@ MODEL_TOKEN_LIMITS = {
     "moonshotai/kimi-k2-instruct-0905": 300_000,
     "openai/gpt-oss-120b": 200_000,
     "openai/gpt-oss-20b": 200_000,
-    "allam-2-7b": 500_000,
     "llama-3.1-8b-instant": 500_000,
     "meta-llama/llama-4-maverick-17b-128e-instruct": 500_000,
     "qwen/qwen3-32b": 500_000,
