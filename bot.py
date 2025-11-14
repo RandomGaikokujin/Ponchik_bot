@@ -21,7 +21,7 @@ short_handler = logging.StreamHandler(sys.stdout)
 short_handler.setFormatter(short_formatter)
 
 # Применяем короткий формат к нужным нам логгерам.
-for logger_name in ["handlers.echo", "handlers.support_command", "httpx"]:
+for logger_name in ["handlers.echo", "handlers.support_command", "httpx", "services.lore_retrieval"]:
     logger_to_customize = logging.getLogger(logger_name)
     logger_to_customize.handlers = []  # Удаляем старые обработчики, чтобы избежать дублирования.
     logger_to_customize.addHandler(short_handler)

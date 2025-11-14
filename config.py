@@ -49,6 +49,7 @@ try:
     # Загружаем все переменные, которые нам нужны
     BOT_TOKEN = get_env_var("BOT_TOKEN")
     GROQ_API_KEY = get_env_var("GROQ_API_KEY")
+    
     SUPPORT_LINK = get_env_var("SUPPORT_LINK")
     # Загружаем ID администратора. Он должен быть числом.
     ADMIN_ID = get_env_var("ADMIN_ID", is_int=True)
