@@ -8,7 +8,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-def get_env_var(var_name: str, is_int: bool = False, is_list_of_int: bool = False, default=None):
+def get_env_var(var_name: str, is_int: bool = False, is_list_of_int: bool = False, is_bool: bool = False, default=None):
     """
     Безопасно загружает переменную окружения и проверяет ее наличие.
     Если указан `default`, переменная становится необязательной.
@@ -26,6 +26,9 @@ def get_env_var(var_name: str, is_int: bool = False, is_list_of_int: bool = Fals
         except ValueError:
             logger.critical(f"ОШИБКА: Переменная {var_name} ('{value}') должна быть числом.")
             raise ValueError(f"Переменная {var_name} должна быть числом")
+
+    if is_bool:
+        return value.lower() in ('true', '1', 't', 'y', 'yes')
 
     if is_list_of_int:
         try:
@@ -53,6 +56,9 @@ try:
     SUPPORT_LINK = get_env_var("SUPPORT_LINK")
     # Загружаем ID администратора. Он должен быть числом.
     ADMIN_ID = get_env_var("ADMIN_ID", is_int=True)
+
+    # Флаг режима обслуживания. По умолчанию выключен.
+    BOT_MAINTENANCE = get_env_var("BOT_MAINTENANCE", is_bool=True, default=False)
     
     # Список заблокированных пользователей (ID)
     BLACKLIST = [

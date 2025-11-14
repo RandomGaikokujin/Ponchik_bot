@@ -8,6 +8,7 @@ from typing import Dict, Any
 # Импортируем утилиты и нужные компоненты из сервиса ИИ
 from services.ai_service import get_ai_response, retrieve_relevant_lore
 from handlers.utils import check_blacklist
+from services.content_filter import filter_and_validate_response
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ def escape_markdown_v2(text: str) -> str:
     escape_chars = r'\_*[]()~`>#+-=|{}.!'
     return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)
 
-from maintenance import BOT_MAINTENANCE
+from config import BOT_MAINTENANCE
 
 @check_blacklist
 async def echo_logic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -66,6 +67,13 @@ async def echo_logic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if len(message_text.strip()) <= 2:
         await update.message.reply_text("И чё это? Напиши подробнее, ёпрст")
         return
+    
+    # Проверяем сообщение на опасный контент (попытка провокации на токсичные темы)
+    final_user_msg, was_msg_filtered = filter_and_validate_response(message_text)
+    if was_msg_filtered:
+        logger.warning(f"Сообщение от {user.full_name} ({user.id}) содержало запрещённый контент. Отказываем и предлагаем другую тему.")
+        await update.message.reply_text("Это не мой базар. Поговорим о чём-нибудь другом.")
+        return
 
     # --- Этапы 1 и 2: Поиск релевантного лора и формирование промпта ---
     # Получаем или создаем историю сообщений для этого пользователя
@@ -95,13 +103,20 @@ async def echo_logic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         used_model = response.get("model", "unknown")
         total_tokens = response.get("tokens", "N/A")
 
-        # Если получили ответ, отсылаем пользователю
+        # Если получили ответ, проверяем его на опасный контент
         if ai_message:
-            await update.message.reply_text(ai_message)
-            logger.info(f"[РУ]Бот ответил {user.full_name} ({user.id}) (модель: {used_model}) (token usage: {total_tokens}): '{ai_message}'")
+            # Фильтруем и проверяем ответ ИИ на токсичность
+            final_response, was_filtered = filter_and_validate_response(ai_message)
+            
+            if was_filtered:
+                logger.warning(f"Ответ ИИ был отфильтрован из-за токсичности для пользователя {user.full_name} ({user.id})")
+            
+            # Отправляем (возможно, отфильтрованный) ответ пользователю
+            await update.message.reply_text(final_response)
+            logger.info(f"[РУ]Бот ответил {user.full_name} ({user.id}) (модель: {used_model}) (token usage: {total_tokens}) (filtered: {was_filtered}): '{final_response}'")
             # Сохраняем ответ ассистента в историю только если это был успешный ответ от модели
             if used_model not in ['error', 'limit_exceeded']:
-                chat_history.append({"role": "assistant", "content": ai_message})
+                chat_history.append({"role": "assistant", "content": final_response})
                 # Сохраняем обновленную историю в user_data
                 context.user_data["chat_history"] = chat_history
         else:
