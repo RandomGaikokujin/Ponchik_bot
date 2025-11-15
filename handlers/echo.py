@@ -46,7 +46,7 @@ async def echo_logic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     # Проверяем, не находится ли бот в режиме обновления
     if BOT_MAINTENANCE:
-        response_text = "[РУ]Бот на обновлении. Напиши попозже!"
+        response_text = "Бот на обновлении. Напиши попозже!"
         logger.info(f"[РУ]Бот ответил {user.full_name} ({user.id}) (модель: system) (token usage: 0): '{response_text}'")
         await update.message.reply_text(response_text)
         return

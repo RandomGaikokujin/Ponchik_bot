@@ -106,7 +106,7 @@ async def get_ai_response(message_history: list, username: str) -> dict:
             raw_message = response.choices[0].message.content
             ai_message = _strip_think_tags(raw_message, model)
             # Temporary log: raw AI message before processing
-            logger.info(f"Raw AI Message: {raw_message}")
+            # logger.info(f"Raw AI Message: {raw_message}")
 
             # Логируем использование токенов в консоль и в БД
             logger.info(f"Token Usage: {username} - {response.usage.total_tokens} (Total)")
