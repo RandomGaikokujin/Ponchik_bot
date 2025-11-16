@@ -46,6 +46,8 @@ from handlers.media_handler import media_handler
 from handlers.support_command import support_handler
 from handlers.stats_command import stats_handler, stats_callback_handler
 from handlers.topusers_command import topusers_handler, topusers_callback_handler
+from handlers.helpadm_command import helpadm_handler
+from handlers.getdb_command import getdb_handler
 
 class HttpxLogFilter(logging.Filter):
     """
@@ -97,7 +99,11 @@ def main() -> None:
     init_db()
 
     # Определяем путь к папке с данными
-    DATA_DIR = "/app/data"
+    IS_RAILWAY = 'RAILWAY_STATIC_URL' in os.environ
+    DATA_DIR = "/app/data" if IS_RAILWAY else os.path.join(os.path.dirname(__file__), 'data')
+    
+    # Убедимся, что папка для данных существует
+    os.makedirs(DATA_DIR, exist_ok=True)
 
     # Создаем объект для сохранения данных. Файл будет создан в той же папке.
     persistence = PicklePersistence(filepath=os.path.join(DATA_DIR, "ponchik_bot_persistence"))
@@ -115,6 +121,8 @@ def main() -> None:
     application.add_handler(stats_callback_handler) # Обработчик кнопок статистики
     application.add_handler(topusers_handler)
     application.add_handler(topusers_callback_handler)
+    application.add_handler(helpadm_handler) # Команда помощи для админа
+    application.add_handler(getdb_handler) # Команда для получения БД
     application.add_handler(media_handler)
     application.add_handler(echo_handler) # Общий обработчик текста ставим в конце
 

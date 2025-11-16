@@ -2,12 +2,21 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 
+from config import BOT_MAINTENANCE, ADMIN_ID
+
 logger = logging.getLogger(__name__)
 
 async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Отвечает на медиафайлы сообщением о том, что бот их не распознает."""
     user = update.effective_user
     logger.info(f"Пользователь {user.full_name} ({user.id}) отправил медиафайл, который не поддерживается.")
+
+    # Если бот на обслуживании и это не админ, отвечаем и выходим
+    if BOT_MAINTENANCE and user.id != ADMIN_ID:
+        response_text = "Бот на обновлении. Напиши попозже!"
+        logger.info(f"Отвечаем на медиафайл сообщением о тех. работах для {user.full_name} ({user.id}).")
+        await update.message.reply_text(response_text)
+        return
 
     # Проверяем, подтвержден ли возраст, так как это общая проверка для всех взаимодействий
     if not context.user_data.get("age_verified"):

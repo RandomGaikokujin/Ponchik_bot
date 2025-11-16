@@ -9,6 +9,7 @@ from typing import Dict, Any
 from services.ai_service import get_ai_response, retrieve_relevant_lore
 from handlers.utils import check_blacklist
 from services.content_filter import filter_and_validate_response
+from database import create_or_update_user, increment_user_requests
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ def escape_markdown_v2(text: str) -> str:
     escape_chars = r'\_*[]()~`>#+-=|{}.!'
     return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)
 
-from config import BOT_MAINTENANCE
+from config import BOT_MAINTENANCE, ADMIN_ID
 
 @check_blacklist
 async def echo_logic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -44,8 +45,15 @@ async def echo_logic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     message_text = update.message.text
     logger.info(f"[РУ]{user.full_name} ({user.id}) написал: '{message_text}'")
 
+    # Регистрируем или обновляем пользователя по каждому сообщению (легкая гарантия наличия записи)
+    try:
+        tg_username = f"@{user.username}" if user.username else None
+        create_or_update_user(user.full_name, tg_username, user.id)
+    except Exception:
+        logger.exception("Не удалось создать/обновить запись пользователя в БД при обработке сообщения")
+
     # Проверяем, не находится ли бот в режиме обновления
-    if BOT_MAINTENANCE:
+    if BOT_MAINTENANCE and user.id != ADMIN_ID:
         response_text = "Бот на обновлении. Напиши попозже!"
         logger.info(f"[РУ]Бот ответил {user.full_name} ({user.id}) (модель: system) (token usage: 0): '{response_text}'")
         await update.message.reply_text(response_text)
@@ -119,6 +127,11 @@ async def echo_logic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 chat_history.append({"role": "assistant", "content": final_response})
                 # Сохраняем обновленную историю в user_data
                 context.user_data["chat_history"] = chat_history
+                # Увеличиваем счетчик запросов пользователя в таблице users
+                try:
+                    increment_user_requests(user.id, 1)
+                except Exception:
+                    logger.exception("Не удалось обновить счетчик запросов пользователя в БД")
         else:
             logger.warning("ИИ вернул пустой ответ.")
             await update.message.reply_text("Спроси лучш чё-нибудь другое.")

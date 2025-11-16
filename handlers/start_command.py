@@ -1,6 +1,7 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, filters
+from database import create_or_update_user
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+    
+    # Регистрируем пользователя в базе (или обновляем запись)
+    try:
+        user = update.effective_user
+        tg_username = f"@{user.username}" if user.username else None
+        create_or_update_user(user.full_name, tg_username, user.id)
+    except Exception:
+        logger.exception("Не удалось создать/обновить запись пользователя в БД при /start")
 
 # Создаем фильтр, чтобы команда работала только в личных чатах.
 # Это хорошая практика, чтобы бот не спамил в группах.

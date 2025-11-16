@@ -1,25 +1,31 @@
 import sqlite3
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # Создаем папку для данных, если она не существует.
 # На Railway этот путь будет указывать на подключенный том (Volume).
-# Используем абсолютный путь для надежности на Railway
-DATA_DIR = "/app/data"
+# Для локальной разработки создаем папку 'data' в корне проекта.
+IS_RAILWAY = 'RAILWAY_STATIC_URL' in os.environ
+DATA_DIR = "/app/data" if IS_RAILWAY else os.path.join(os.path.dirname(__file__), '..', 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
-DB_NAME = os.path.join(DATA_DIR, "token_usage.db")
+
+# Основная БД приложения теперь ponchik_db (SQLite файл)
+DB_NAME = os.path.join(DATA_DIR, "ponchik_db.db")
 
 def init_db():
     """
     Инициализирует базу данных.
-    Создает таблицу 'usage' и добавляет колонку 'model_name', если их нет.
+    Создает таблицы 'usage' (для совместимости) и 'users' (новая схема).
+    Сохраняет обратную совместимость, добавляя колонку 'model_name' в usage при необходимости.
     """
     try:
         with sqlite3.connect(DB_NAME) as conn:
             cursor = conn.cursor()
+            # Таблица usage (сохраняем для совместимости с предыдущей логикой)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS usage (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,6 +38,18 @@ def init_db():
                     user_message TEXT NOT NULL,
                     ai_response TEXT NOT NULL,
                     model_name TEXT NOT NULL
+                )
+            """)
+
+            # Новая таблица пользователей
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nickname TEXT,
+                    tg_username TEXT,
+                    tg_id INTEGER UNIQUE,
+                    activation_date TEXT,
+                    total_requests INTEGER DEFAULT 0
                 )
             """)
 
@@ -48,6 +66,11 @@ def init_db():
 
             conn.commit()
         logger.info(f"База данных '{DB_NAME}' успешно инициализирована.")
+        # После инициализации выполняем очистку старых записей (по умолчанию сохраняем до и включая 'позавчера')
+        try:
+            purge_old_usage()
+        except Exception as e:
+            logger.error(f"Ошибка при запуске очистки старых записей: {e}")
     except sqlite3.Error as e:
         logger.critical(f"Ошибка при инициализации базы данных SQLite: {e}")
         raise
@@ -77,6 +100,101 @@ def log_usage_to_db(username: str, user_message: str, usage_data, ai_response: s
             conn.commit()
     except sqlite3.Error as e:
         logger.error(f"Ошибка при записи в базу данных SQLite: {e}")
+
+
+def create_or_update_user(nickname: Optional[str], tg_username: Optional[str], tg_id: Optional[int], activation_date: Optional[str] = None):
+    """Создаёт пользователя если не существует или обновляет nickname/tg_username. Возвращает dict пользователя."""
+    if tg_id is None:
+        return None
+
+    if activation_date is None:
+        activation_date = datetime.now().strftime("%Y-%m-%d")
+
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            # Пытаемся вставить нового пользователя, если tg_id уникален
+            cursor.execute("SELECT id FROM users WHERE tg_id = ?", (tg_id,))
+            row = cursor.fetchone()
+            if row:
+                # Обновляем данные
+                cursor.execute(
+                    "UPDATE users SET nickname = ?, tg_username = ? WHERE tg_id = ?",
+                    (nickname, tg_username, tg_id)
+                )
+            else:
+                cursor.execute(
+                    "INSERT INTO users (nickname, tg_username, tg_id, activation_date, total_requests) VALUES (?, ?, ?, ?, ?)",
+                    (nickname, tg_username, tg_id, activation_date, 0)
+                )
+            conn.commit()
+            cursor.execute("SELECT * FROM users WHERE tg_id = ?", (tg_id,))
+            r = cursor.fetchone()
+            if r:
+                cols = [d[0] for d in cursor.description]
+                return dict(zip(cols, r))
+    except sqlite3.Error as e:
+        logger.error(f"Ошибка при создании/обновлении пользователя: {e}")
+    return None
+
+
+def get_user_by_tg_id(tg_id: int) -> Optional[dict]:
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM users WHERE tg_id = ?", (tg_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    except sqlite3.Error as e:
+        logger.error(f"Ошибка при чтении пользователя: {e}")
+        return None
+
+
+def increment_user_requests(tg_id: int, delta: int = 1):
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET total_requests = total_requests + ? WHERE tg_id = ?", (delta, tg_id))
+            conn.commit()
+    except sqlite3.Error as e:
+        logger.error(f"Ошибка при обновлении счетчика запросов пользователя: {e}")
+
+
+def get_all_users() -> list[dict]:
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT nickname, tg_username, tg_id, activation_date, total_requests FROM users ORDER BY total_requests DESC")
+            return [dict(r) for r in cursor.fetchall()]
+    except sqlite3.Error as e:
+        logger.error(f"Ошибка при получении списка пользователей: {e}")
+        return []
+
+
+def purge_old_usage(retention_days: int = 2) -> int:
+    """
+    Удаляет записи из таблицы `usage`, у которых дата(timestamp) строго меньше чем
+    (сегодня - retention_days). По умолчанию retention_days=2 — это означает,
+    что сохраняются записи за сегодня, вчера и позавчера; всё, что старше позавчера,
+    будет удалено.
+
+    Возвращает количество удалённых записей.
+    """
+    try:
+        cutoff_date = (datetime.now().date() - timedelta(days=retention_days)).strftime("%Y-%m-%d")
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            # Удаляем строки с датой меньше cutoff_date
+            cursor.execute("DELETE FROM usage WHERE date(timestamp) < ?", (cutoff_date,))
+            deleted = cursor.rowcount if cursor.rowcount is not None else 0
+            conn.commit()
+        logger.info(f"Очистка БД: удалено {deleted} записей из 'usage' старше чем {cutoff_date}.")
+        return deleted
+    except sqlite3.Error as e:
+        logger.error(f"Ошибка при очистке старых записей usage: {e}")
+        return 0
 
 def get_stats_for_date(date_str: str) -> list[dict]:
     """
