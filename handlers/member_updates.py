@@ -1,5 +1,6 @@
 import logging
 import random
+import asyncio
 from telegram import Update, ChatMember
 from telegram.ext import ContextTypes, ChatMemberHandler
 
@@ -42,7 +43,11 @@ async def track_chats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         # Форматируем сообщение, подставляя имя пользователя
         message_to_send = random_phrase.format(user_full_name=user.full_name)
 
-        logger.info(f"Пользователь {user.full_name} ({user.id}) был забанен в чате {update.effective_chat.title} ({update.effective_chat.id}).")
+        logger.info(f"Пользователь {user.full_name} ({user.id}) был забанен в чате {update.effective_chat.title} ({update.effective_chat.id}). Отправка сообщения через 1 секунду.")
+        
+        # Добавляем задержку в 1 секунду
+        await asyncio.sleep(1)
+        
         # Отправляем сообщение в чат о бане
         await update.effective_chat.send_message(message_to_send)
 
