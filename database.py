@@ -25,6 +25,15 @@ def init_db():
     Сохраняет обратную совместимость, добавляя колонку 'model_name' в usage при необходимости.
     """
     try:
+        # Диагностическая информация: логируем состояние файла БД и окружения
+        try:
+            db_exists = os.path.exists(DB_NAME)
+            db_size = os.path.getsize(DB_NAME) if db_exists else 0
+        except Exception:
+            db_exists = False
+            db_size = 0
+        logger.info(f"Инициализация БД: path={DB_NAME}, exists={db_exists}, size={db_size} bytes, DATA_DIR={DATA_DIR}")
+        logger.info(f"Env markers: RAILWAY_ENVIRONMENT={'RAILWAY_ENVIRONMENT' in os.environ}, PORT={os.environ.get('PORT')}, RAILWAY_STATIC_URL={'RAILWAY_STATIC_URL' in os.environ}")
         with sqlite3.connect(DB_NAME) as conn:
             cursor = conn.cursor()
             # Таблица usage (сохраняем для совместимости с предыдущей логикой)
