@@ -65,7 +65,7 @@ def _strip_think_tags(text: str, model_name: str) -> str:
     return text.strip()
 
 
-async def get_ai_response(message_history: list, username: str) -> dict:
+async def get_ai_response(message_history: list, tg_id: int, username: str) -> dict:
     """
     Отправляет историю сообщений в Groq. При достижении лимита одной модели,
     автоматически переключается на следующую из списка.
@@ -110,7 +110,7 @@ async def get_ai_response(message_history: list, username: str) -> dict:
 
             # Логируем использование токенов в консоль и в БД
             logger.info(f"Token Usage: {username} - {response.usage.total_tokens} (Total)")
-            log_usage_to_db(username, user_query, response.usage, ai_message, lore_chunks_count, model)
+            log_usage_to_db(tg_id, username, user_query, response.usage, ai_message, lore_chunks_count, model)
             return {
                 "message": ai_message,
                 "model": model,
@@ -123,7 +123,7 @@ async def get_ai_response(message_history: list, username: str) -> dict:
             # Специальная обработка ошибки "Request Entity Too Large"
             if "Error code: 413" in str(e) and "Request Entity Too Large" in str(e):
                 logger.warning(f"Ошибка 413 (Request Too Large) с моделью {model}. Попытка отправить запрос без лора.")
-                return await get_ai_response_without_lore(message_history, model, username)
+                return await get_ai_response_without_lore(message_history, model, tg_id, username)
 
             logger.error(f"Критическая ошибка при обращении к Groq API с моделью {model}: {e}")
             return {"message": "Хм, чёт у меня какие-то неполадки... Напиши потом.", "model": "error"}
@@ -136,7 +136,7 @@ async def get_ai_response(message_history: list, username: str) -> dict:
     }
     
 
-async def get_ai_response_without_lore(message_history: list, model: str, username: str) -> dict:
+async def get_ai_response_without_lore(message_history: list, model: str, tg_id: int, username: str) -> dict:
     """Запасной метод для отправки запроса без RAG-контекста."""
     try:
         logger.info(f"Повторная отправка запроса в Groq (модель: {model}) без лора.")
@@ -155,7 +155,7 @@ async def get_ai_response_without_lore(message_history: list, model: str, userna
         raw_message = response.choices[0].message.content
         ai_message = _strip_think_tags(raw_message, model)
         logger.info(f"Token Usage (without lore): {username} - {response.usage.total_tokens} (Total)")
-        log_usage_to_db(username, message_history[-1]['content'], response.usage, ai_message, lore_chunks_count=0, model_name=model)
+        log_usage_to_db(tg_id, username, message_history[-1]['content'], response.usage, ai_message, lore_chunks_count=0, model_name=model)
         return {
             "message": ai_message,
             "model": model,

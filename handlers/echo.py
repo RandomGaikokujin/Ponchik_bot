@@ -8,8 +8,8 @@ from typing import Dict, Any
 # Импортируем утилиты и нужные компоненты из сервиса ИИ
 from services.ai_service import get_ai_response, retrieve_relevant_lore
 from handlers.utils import check_blacklist
-from services.content_filter import filter_and_validate_response
-from database import create_or_update_user, increment_user_requests
+from services.content_filter import filter_and_validate_response # Импортируем фильтр контента
+from database import create_or_update_user # Импортируем только нужную функцию
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +104,11 @@ async def echo_logic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
 
         # Получаем ответ от ИИ
-        # Передаем полное имя пользователя для логирования
-        response: Dict[str, Any] = await get_ai_response(chat_history, user.full_name or str(user.id))
+        response: Dict[str, Any] = await get_ai_response(
+            message_history=chat_history,
+            tg_id=user.id,
+            username=user.full_name or str(user.id)
+        )
         
         ai_message = response.get("message")
         used_model = response.get("model", "unknown")
@@ -123,15 +126,25 @@ async def echo_logic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             await update.message.reply_text(final_response)
             logger.info(f"[РУ]Бот ответил {user.full_name} ({user.id}) (модель: {used_model}) (token usage: {total_tokens}) (filtered: {was_filtered}): '{final_response}'")
             # Сохраняем ответ ассистента в историю только если это был успешный ответ от модели
-            if used_model not in ['error', 'limit_exceeded']:
+            if used_model not in ['error', 'limit_exceeded', 'system']:
                 chat_history.append({"role": "assistant", "content": final_response})
                 # Сохраняем обновленную историю в user_data
                 context.user_data["chat_history"] = chat_history
-                # Увеличиваем счетчик запросов пользователя в таблице users
+
+                # --- Поддержка бота: отправлять сообщение "Поддержи бота" каждые 20 нормальных ответов ---
+                # Используем отдельный ключ в user_data, чтобы считать только нормальные ответы (не ошибки и не system)
+                support_key = "support_counter"
+                current = context.user_data.get(support_key, 0) + 1
+                # Сохраняем обновлённое значение
+                context.user_data[support_key] = current
                 try:
-                    increment_user_requests(user.id, 1)
+                    # Если достигли порога — отправляем сообщение и сбрасываем счётчик
+                    if current >= 30:
+                        await update.message.reply_text("Бот работает для вас совершенно бесплатно, но на платном хостинге. Пожалуйста поддержите работу бота, если он вам нравится 😊 - https://www.donationalerts.com/r/voronstalker")
+                        context.user_data[support_key] = 0
                 except Exception:
-                    logger.exception("Не удалось обновить счетчик запросов пользователя в БД")
+                    # Не критично — логируем и продолжаем
+                    logger.exception("Не удалось отправить сообщение о поддержке бота")
         else:
             logger.warning("ИИ вернул пустой ответ.")
             await update.message.reply_text("Спроси лучш чё-нибудь другое.")

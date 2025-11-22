@@ -22,7 +22,8 @@ async def helpadm_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         "<b>Команды администратора:</b>\n\n"
         "<code>/stats</code> — Показать статистику использования моделей за сегодня/вчера/позавчера.\n\n"
         "<code>/topusers</code> — Показать топ-20 пользователей по активности за выбранный день.\n\n"
-        "<code>/getdb</code> — Получить файл базы данных."
+        "<code>/getdb</code> — Получить файл базы данных.\n\n"
+        "<code>/globalmessage &lt;текст&gt;</code> — Написать сообщение всем от бота."
     )
 
     await update.message.reply_text(text=admin_commands_text, parse_mode=ParseMode.HTML)

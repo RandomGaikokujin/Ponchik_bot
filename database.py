@@ -75,11 +75,15 @@ def init_db():
         logger.critical(f"Ошибка при инициализации базы данных SQLite: {e}")
         raise
 
-def log_usage_to_db(username: str, user_message: str, usage_data, ai_response: str, lore_chunks_count: int = 0, model_name: str = "unknown"):
-    """Записывает информацию о расходе токенов в базу данных SQLite."""
+def log_usage_to_db(tg_id: int, username: str, user_message: str, usage_data, ai_response: str, lore_chunks_count: int = 0, model_name: str = "unknown"):
+    """
+    Записывает информацию о расходе токенов в таблицу 'usage'
+    и одновременно увеличивает счетчик 'total_requests' в таблице 'users'.
+    """
     if not usage_data:
         return
 
+    # --- Шаг 1: Логирование в таблицу 'usage' ---
     try:
         with sqlite3.connect(DB_NAME) as conn:
             cursor = conn.cursor()
@@ -100,6 +104,9 @@ def log_usage_to_db(username: str, user_message: str, usage_data, ai_response: s
             conn.commit()
     except sqlite3.Error as e:
         logger.error(f"Ошибка при записи в базу данных SQLite: {e}")
+
+    # --- Шаг 2: Инкремент общего счетчика запросов ---
+    increment_user_requests(tg_id=tg_id)
 
 
 def create_or_update_user(nickname: Optional[str], tg_username: Optional[str], tg_id: Optional[int], activation_date: Optional[str] = None):
