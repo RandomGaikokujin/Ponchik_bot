@@ -3,7 +3,7 @@ import asyncio
 import time
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler, filters
-from telegram.error import Forbidden, BadRequest
+from telegram.error import Forbidden, BadRequest, TelegramError
 
 from config import ADMIN_ID
 from database import get_all_users
@@ -24,10 +24,20 @@ async def globalmessage_command(update: Update, context: ContextTypes.DEFAULT_TY
 
     # Проверяем, есть ли текст сообщения
     if not context.args:
-        await update.message.reply_text("Пожалуйста, укажите текст сообщения после команды. \nПример: `/globalmessage Бот будет перезагружен через 5 минут.`", parse_mode='Markdown')
+        await update.message.reply_text(
+            "Пожалуйста, укажите текст сообщения после команды.\n"
+            "Поддерживается HTML-разметка.\n\n"
+            "<b>Пример:</b>\n"
+            "<code>/globalmessage Привет!\n\nБот будет перезагружен через <b>5 минут</b>.</code>",
+            parse_mode='HTML'
+        )
         return
 
-    message_to_send = " ".join(context.args)
+    # Получаем весь текст после команды /globalmessage
+    # Это позволяет сохранять переносы строк и использовать форматирование
+    command = "/globalmessage"
+    message_to_send = update.message.text[len(command):].strip()
+
     users = get_all_users()
 
     if not users:
@@ -54,14 +64,14 @@ async def globalmessage_command(update: Update, context: ContextTypes.DEFAULT_TY
         user_info_str = ", ".join(user_info_parts)
 
         try:
-            await context.bot.send_message(chat_id=tg_id, text=message_to_send)
+            await context.bot.send_message(chat_id=tg_id, text=message_to_send, parse_mode='HTML')
             success_count += 1
         except (Forbidden, BadRequest):
             # Forbidden: пользователь заблокировал бота.
             # BadRequest: неверный ID или пользователь удалил чат.
             fail_count += 1
             logger.warning(f"Не удалось отправить сообщение пользователю ({user_info_str}). Возможно, он заблокировал бота.")
-        except Exception as e:
+        except TelegramError as e:
             fail_count += 1
             logger.error(f"Неизвестная ошибка при отправке сообщения пользователю ({user_info_str}): {e}")
         await asyncio.sleep(0.1) # Небольшая задержка, чтобы не превысить лимиты Telegram

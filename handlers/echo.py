@@ -139,7 +139,7 @@ async def echo_logic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 context.user_data[support_key] = current
                 try:
                     # Если достигли порога — отправляем сообщение и сбрасываем счётчик
-                    if current >= 30:
+                    if current >= 25:
                         await update.message.reply_text("Бот работает для вас совершенно бесплатно, но на платном хостинге. Пожалуйста поддержите работу бота, если он вам нравится 😊 - https://www.donationalerts.com/r/voronstalker")
                         context.user_data[support_key] = 0
                 except Exception:
