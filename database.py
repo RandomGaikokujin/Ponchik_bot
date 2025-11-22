@@ -9,7 +9,9 @@ logger = logging.getLogger(__name__)
 # Создаем папку для данных, если она не существует.
 # На Railway этот путь будет указывать на подключенный том (Volume).
 # Для локальной разработки создаем папку 'data' в корне проекта.
-IS_RAILWAY = 'RAILWAY_STATIC_URL' in os.environ
+# Railway имеет переменные окружения: PORT, RAILWAY_ENVIRONMENT, DATABASE_URL и т.д.
+# Проверяем наличие RAILWAY_ENVIRONMENT или PORT (более надежные маркеры Railway)
+IS_RAILWAY = 'RAILWAY_ENVIRONMENT' in os.environ or ('PORT' in os.environ and os.path.exists('/app'))
 DATA_DIR = "/app/data" if IS_RAILWAY else os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 

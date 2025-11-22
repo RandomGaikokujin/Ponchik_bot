@@ -103,7 +103,9 @@ def main() -> None:
     init_db()
 
     # Определяем путь к папке с данными
-    IS_RAILWAY = 'RAILWAY_STATIC_URL' in os.environ
+    # Railway имеет переменные окружения: PORT, RAILWAY_ENVIRONMENT, DATABASE_URL и т.д.
+    # Проверяем наличие RAILWAY_ENVIRONMENT или PORT (более надежные маркеры Railway)
+    IS_RAILWAY = 'RAILWAY_ENVIRONMENT' in os.environ or ('PORT' in os.environ and os.path.exists('/app'))
     DATA_DIR = "/app/data" if IS_RAILWAY else os.path.join(os.path.dirname(__file__), 'data')
     
     # Убедимся, что папка для данных существует
