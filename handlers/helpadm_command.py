@@ -22,6 +22,7 @@ async def helpadm_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         "<b>Команды администратора:</b>\n\n"
         "<code>/stats</code> — Показать статистику использования моделей за сегодня/вчера/позавчера.\n\n"
         "<code>/topusers</code> — Показать топ-20 пользователей по активности за выбранный день.\n\n"
+        "<code>/cdcheck</code> — Проверить кулдауны в группах.\n\n"
         "<code>/getdb</code> — Получить файл базы данных.\n\n"
         "<code>/globalmessage &lt;текст&gt;</code> — Написать сообщение всем от бота."
     )
